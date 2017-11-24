@@ -14,8 +14,15 @@
 LiquidCrystal_I2C lcd(0x20, 16, 2);
 SoftwareSerial BTSerial(btPinRX, btPinTX);
 
-const float coffeeConcentration = 68.9f / 100.0f; //concentration of coffee in mg/ml
-
+float coffeeConcentration = 68.9f / 100.0f; //concentration of coffee in mg/ml
+const float caffeineExpresso = 45.0f / 30.0f ;
+const float caffeineDarkRoast = 68.9f / 100.0f ;
+const float caffeineDecaf =  5.0f / 295.7f ;
+const float calorieCoffee = 0 ;
+const float calorieSugarShot = 63.45f;
+const float caloriesCreamShot = 67.5f ;
+const int maxInputSize = 4 ;
+char BTRec[maxInputSize] = {'0', '0', '0', '0'} ;
 float mugRadius = 1.75f; //radius of mug in cm
 
 int refreshTime = 3000;
@@ -45,6 +52,7 @@ void setup()
 {
 	Serial.begin(9600);
 	BTSerial.begin(9600);
+ 
 
 	pinMode(backlightPin, OUTPUT);
 	digitalWrite(backlightPin, HIGH);
@@ -65,16 +73,20 @@ void setup()
 	lcd.print(caffeineLevel);
 	lcd.print("mg");
 
-	BTSerial.write("hello");
+	
 
 	lcd.setCursor(0, 1);
 	if (isLocked)
 		lcd.print("LOCKED");
 	else lcd.print("UNLOCKED");
+ char a[maxInputSize] = {0, 0};
+ int i = 0 ;
 }
+
 
 void loop()
 {
+  checkCoffeeType() ;
 	int dist = getDistance();
 	if (dist <= maxDist && dist >= minDist) {
 		distData[dist - minDist]++;
@@ -94,6 +106,47 @@ void loop()
 	}
 	delay(100);
 }
+void checkCoffeeType()
+{
+  int i = 0 ;
+  do
+{
+  BTRec[i] = BTSerial.read() ;
+  i++ ;
+}
+  while (i < maxInputSize) ;
+ switch (BTRec[0]) 
+ { 
+  case 'a':
+  // if filled with expresso (unlikely), it will change to expresso
+  coffeeConcentration = caffeineExpresso ;
+  break;
+  case 'b':
+  // if filled with dark roast
+  coffeeConcentration = caffeineDarkRoast ;
+  break ;
+  case 'c':
+  //if filled with decaf
+  coffeeConcentration = caffeineDecaf ;
+  default:
+  break ;
+ }
+}
+ int getDistance() {
+
+ digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(15);
+  digitalWrite(trigPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH);
+
+  distance_cm = microsecondsToCentimeters(duration);
+
+  return distance_cm;
+}
+
 
 void updateLevels() {
 	Serial.print(refreshTime / 1000);
@@ -132,20 +185,6 @@ long microsecondsToCentimeters(long ms) {
 	return ms / 29 / 2;
 }
 
-long getDistance() {
-
-	digitalWrite(trigPin, LOW);
-	delayMicroseconds(2);
-	digitalWrite(trigPin, HIGH);
-	delayMicroseconds(15);
-	digitalWrite(trigPin, LOW);
-
-	duration = pulseIn(echoPin, HIGH);
-
-	distance_cm = microsecondsToCentimeters(duration);
-
-	return distance_cm;
-}
 
 void decrCaffeineLevel(float timeInSeconds) {
 	Serial.print("Decr conc. by: ");
