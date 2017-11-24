@@ -15,12 +15,14 @@ LiquidCrystal_I2C lcd(0x20, 16, 2);
 SoftwareSerial BTSerial(btPinRX, btPinTX);
 
 float coffeeConcentration = 68.9f / 100.0f; //concentration of coffee in mg/ml
+const float unhealthyCaffeineLevel = 100.0f ;
 const float caffeineExpresso = 45.0f / 30.0f ;
 const float caffeineDarkRoast = 68.9f / 100.0f ;
 const float caffeineDecaf =  5.0f / 295.7f ;
 const float calorieCoffee = 0 ;
-const float calorieSugarShot = 63.45f;
-const float caloriesCreamShot = 67.5f ;
+const float calorieSugarShot = 61.34f / 591.5f;
+const float caloriesCreamShot = 69.6f / 591.5f ;
+const float caloriesMilkShot = 35.2f / 591.5f ;
 const int maxInputSize = 4 ;
 char BTRec[maxInputSize] = {'0', '0', '0', '0'} ;
 float mugRadius = 1.75f; //radius of mug in cm
@@ -50,35 +52,35 @@ String hello = "hello world";
 
 void setup()
 {
-	Serial.begin(9600);
-	BTSerial.begin(9600);
+  Serial.begin(9600);
+  BTSerial.begin(9600);
  
 
-	pinMode(backlightPin, OUTPUT);
-	digitalWrite(backlightPin, HIGH);
+  pinMode(backlightPin, OUTPUT);
+  digitalWrite(backlightPin, HIGH);
 
-	lcd.init();
-	lcd.backlight();
+  lcd.init();
+  lcd.backlight();
 
-	pinMode(trigPin, OUTPUT);
-	pinMode(echoPin, INPUT);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
 
-	my_servo.attach(servoPin);// attach your servo
-	my_servo.writeMicroseconds(1500);
+  my_servo.attach(servoPin);// attach your servo
+  my_servo.writeMicroseconds(1500);
 
-	my_servo.write(0);
-	firstReading = true;
+  my_servo.write(0);
+  firstReading = true;
 
-	lcd.print("Intake: ");
-	lcd.print(caffeineLevel);
-	lcd.print("mg");
+  lcd.print("Intake: ");
+  lcd.print(caffeineLevel);
+  lcd.print("mg");
 
-	
+  
 
-	lcd.setCursor(0, 1);
-	if (isLocked)
-		lcd.print("LOCKED");
-	else lcd.print("UNLOCKED");
+  lcd.setCursor(0, 1);
+  if (isLocked)
+    lcd.print("LOCKED");
+  else lcd.print("UNLOCKED");
  char a[maxInputSize] = {0, 0};
  int i = 0 ;
 }
@@ -86,35 +88,37 @@ void setup()
 
 void loop()
 {
-  checkCoffeeType() ;
-	int dist = getDistance();
-	if (dist <= maxDist && dist >= minDist) {
-		distData[dist - minDist]++;
-	}
-
-	if (millis() > dynamicTimeThreshhold) {
-		updateLevels();
-		if (caffeineLevel > 100) {
-			my_servo.write(90);
-			isLocked = true;
-		}
-		else {
-			my_servo.write(0);
-			isLocked = false;
-		}
-		printLCD(caffeineLevel, isLocked);
-	}
-	delay(100);
-}
-void checkCoffeeType()
-{
-  int i = 0 ;
-  do
+   int i = 0 ;
+ while (i < maxInputSize && BTSerial.available())
 {
   BTRec[i] = BTSerial.read() ;
   i++ ;
+} 
+  int dist = getDistance();
+  if (dist <= maxDist && dist >= minDist) {
+    distData[dist - minDist]++;
+  }
+
+  if (millis() > dynamicTimeThreshhold) {
+    checkCoffeeType() ;
+    float Calories = checkCalorieCount() ;
+    updateLevels();
+    if (caffeineLevel > unhealthyCaffeineLevel) {
+      my_servo.write(90);
+      isLocked = true;
+    }
+    else {
+      my_servo.write(0);
+      isLocked = false;
+    }
+    printLCD(caffeineLevel, isLocked, Calories);
+  }
+  delay(100);
 }
-  while (i < maxInputSize) ;
+void checkCoffeeType()
+{
+
+  
  switch (BTRec[0]) 
  { 
   case 'a':
@@ -132,6 +136,21 @@ void checkCoffeeType()
   break ;
  }
 }
+ float checkCalorieCount()
+ {
+  float volume = 3.81f*3.81f*3.14f*(getDistance()) ;
+  float calories_mL = 0.0f ;
+  // data input 2 should be sugar
+  int sugar = BTRec[2-1] - 48 ;
+  calories_mL += sugar*calorieSugarShot ;
+  // data input 3 should be cream
+  int cream = BTRec[3-1] - 48 ;
+  calories_mL += cream * caloriesCreamShot ;
+  // data input 4 should be milk
+  int milk = BTRec[4-1] -48;
+  calories_mL += milk ;
+  return calories_mL * volume ;
+ }
  int getDistance() {
 
  digitalWrite(trigPin, LOW);
@@ -149,87 +168,88 @@ void checkCoffeeType()
 
 
 void updateLevels() {
-	Serial.print(refreshTime / 1000);
-	Serial.println(" seconds has passed");
-	dynamicTimeThreshhold = dynamicTimeThreshhold + refreshTime;
+  Serial.print(refreshTime / 1000);
+  Serial.println(" seconds has passed");
+  dynamicTimeThreshhold = dynamicTimeThreshhold + refreshTime;
 
-	if (firstReading) {
-		currentModeDist = getMode();
-		prevModeDist = currentModeDist;
-		firstReading = false;
-	}
-	else {
-		prevModeDist = currentModeDist;
-		currentModeDist = getMode();
-	}
+  if (firstReading) {
+    currentModeDist = getMode();
+    prevModeDist = currentModeDist;
+    firstReading = false;
+  }
+  else {
+    prevModeDist = currentModeDist;
+    currentModeDist = getMode();
+  }
 
-	Serial.print("Previous modal dist: ");
-	Serial.print(prevModeDist);
-	Serial.println("cm");
-	Serial.print("Current modal dist: ");
-	Serial.print(currentModeDist);
-	Serial.println("cm");
+  Serial.print("Previous modal dist: ");
+  Serial.print(prevModeDist);
+  Serial.println("cm");
+  Serial.print("Current modal dist: ");
+  Serial.print(currentModeDist);
+  Serial.println("cm");
 
-	decrCaffeineLevel(60);
-	incrCaffeineLevel(prevModeDist, currentModeDist);
+  decrCaffeineLevel(60);
+  incrCaffeineLevel(prevModeDist, currentModeDist);
 
-	Serial.print("Final caffeine lvl: ");
-	Serial.print(caffeineLevel);
-	Serial.println("mg");
-	Serial.println();
+  Serial.print("Final caffeine lvl: ");
+  Serial.print(caffeineLevel);
+  Serial.println("mg");
+  Serial.println();
 
-	clearData();
+  clearData();
 }
 
 long microsecondsToCentimeters(long ms) {
-	return ms / 29 / 2;
+  return ms / 29 / 2;
 }
 
 
 void decrCaffeineLevel(float timeInSeconds) {
-	Serial.print("Decr conc. by: ");
-	Serial.print(caffeineLevel - caffeineLevel * pow(0.5f, timeInSeconds / halfLifeSeconds));
-	Serial.println("mg");
-	caffeineLevel *= pow(0.5f, timeInSeconds / halfLifeSeconds);
+  Serial.print("Decr conc. by: ");
+  Serial.print(caffeineLevel - caffeineLevel * pow(0.5f, timeInSeconds / halfLifeSeconds));
+  Serial.println("mg");
+  caffeineLevel *= pow(0.5f, timeInSeconds / halfLifeSeconds);
 }
 
 void incrCaffeineLevel(int prevDist, int newDist) {
-	if (newDist > prevDist) {
-		caffeineLevel += getVolume(newDist - prevDist) * coffeeConcentration;
-		Serial.print("Incr conc by: ");
-		Serial.print(getVolume(newDist - prevDist) * coffeeConcentration);
-		Serial.println("mg");
-	}
+  if (newDist > prevDist) {
+    caffeineLevel += getVolume(newDist - prevDist) * coffeeConcentration;
+    Serial.print("Incr conc by: ");
+    Serial.print(getVolume(newDist - prevDist) * coffeeConcentration);
+    Serial.println("mg");
+  }
 }
 
 void clearData() {
-	for (int i = 0; i < arraySize; i++)
-		distData[i] = 0;
+  for (int i = 0; i < arraySize; i++)
+    distData[i] = 0;
 }
 
 int getMode() {
-	int mode, largestValue = 0;
-	for (int i = 0; i < arraySize; i++) {
-		if (distData[i] > largestValue) {
-			largestValue = distData[i];
-			mode = i + minDist;
-		}
-	}
-	return mode;
+  int mode, largestValue = 0;
+  for (int i = 0; i < arraySize; i++) {
+    if (distData[i] > largestValue) {
+      largestValue = distData[i];
+      mode = i + minDist;
+    }
+  }
+  return mode;
 }
 
 float getVolume(int distance) {
-	return PI * pow(mugRadius, 2.0f) * distance;
+  return PI * pow(mugRadius, 2.0f) * distance;
 }
 
-void printLCD(float intakeLevel, bool isLocked) {
-	lcd.clear();
-	lcd.print("Intake: ");
-	lcd.print(intakeLevel);
-	lcd.print("mg");
+void printLCD(float intakeLevel, bool isLocked, float Calories) {
+  lcd.clear();
+  lcd.print("Intake: ");
+  lcd.print(intakeLevel);
+  lcd.print("mg");
 
-	lcd.setCursor(0, 1);
-	if (isLocked)
-		lcd.print("LOCKED");
-	else lcd.print("UNLOCKED");
+  lcd.setCursor(0, 1);
+  if (isLocked)
+    lcd.print("LOCKED");
+  else lcd.print("UNLOCKED");
+ lcd.print(Calories) ;
 }
